@@ -5,7 +5,7 @@ Aplicação web completa para gerenciar sua saúde: acompanhe especialidades, co
 ## ✨ Funcionalidades
 
 - **Dashboard** com visão geral de todas as especialidades: última visita, dias para próxima consulta e total de exames.
-- **Menu lateral** com todas as especialidades (Cardiologia, Gastro, Oftalmo, etc.) e acesso rápido aos exames de sangue.
+- **Menu lateral** com todas as especialidades e acesso rápido aos exames de sangue e configurações.
 - **Página de cada especialidade**:
   - Histórico de consultas (data, médico, observações)
   - Histórico de exames com **upload de arquivos** (PDF, PNG, JPEG)
@@ -14,11 +14,14 @@ Aplicação web completa para gerenciar sua saúde: acompanhe especialidades, co
 - **Exames de Sangue**:
   - Registro de múltiplos parâmetros (hemoglobina, glicose, colesterol, triglicerídeos, HDL, LDL, Vitamina D)
   - **Gráfico comparativo** dos últimos 5 exames para visualizar evolução
+- **Configurações**:
+  - Exportar/importar todos os dados (backup em JSON)
+  - Limpar todos os dados
 
 ## 🚀 Como usar
 
-1. Baixe todos os arquivos (index.html, styles.css, app.js) e coloque-os na mesma pasta.
-2. Abra o arquivo `index.html` no seu navegador (qualquer navegador moderno).
+1. Baixe todos os arquivos e coloque-os na mesma pasta.
+2. Abra o `index.html` no seu navegador (qualquer navegador moderno).
 3. Todos os dados são salvos automaticamente no localStorage – você pode fechar e reabrir que os dados permanecem.
 
 ## 📁 Estrutura
