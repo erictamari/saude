@@ -1,67 +1,621 @@
-const DEMO={config:{labor:5200,fixed:2800,target:20000},ingredients:[
-{id:1,name:"Filé de frango",unit:"kg",price:18.9,supplier:"Atacado",stock:32,min:10},
-{id:2,name:"Batata congelada",unit:"kg",price:12.5,supplier:"Distribuidor",stock:25,min:8},
-{id:3,name:"Linguiça de frango",unit:"kg",price:21.9,supplier:"Atacado",stock:12,min:5},
-{id:4,name:"Farinha de trigo",unit:"kg",price:6.8,supplier:"Atacado",stock:9,min:4},
-{id:5,name:"Óleo de soja",unit:"L",price:7.9,supplier:"Atacado",stock:18,min:6},
-{id:6,name:"Gochujang",unit:"kg",price:39.9,supplier:"Importados",stock:2.5,min:1},
-{id:7,name:"Molho de laranja",unit:"kg",price:22,supplier:"Produção própria",stock:3,min:1},
-{id:8,name:"Muçarela",unit:"kg",price:34.9,supplier:"Laticínios",stock:5,min:2}],products:[
-{id:1,name:"TRIO",price:45,recipe:[{i:1,q:.18},{i:3,q:.15},{i:2,q:.25}],sold:96},
-{id:2,name:"Frango Supremo",price:85,recipe:[{i:1,q:.65},{i:4,q:.08},{i:5,q:.04}],sold:72},
-{id:3,name:"Korean Chicken",price:59.9,recipe:[{i:1,q:.45},{i:6,q:.06},{i:4,q:.06},{i:5,q:.03}],sold:58},
-{id:4,name:"Orange Chicken",price:59.9,recipe:[{i:1,q:.45},{i:7,q:.08},{i:4,q:.06},{i:5,q:.03}],sold:44},
-{id:5,name:"Porção Mista G",price:72,recipe:[{i:1,q:.4},{i:3,q:.2},{i:2,q:.25}],sold:51},
-{id:6,name:"Porção Frango Empanado G",price:79,recipe:[{i:1,q:.65},{i:4,q:.08},{i:5,q:.04}],sold:63},
-{id:7,name:"Mac & Cheese + Frango",price:36.9,recipe:[{i:1,q:.16},{i:8,q:.06},{i:4,q:.03}],sold:39}],sales:[
-{id:1,date:"2026-08-20",product:1,qty:5},{id:2,date:"2026-08-20",product:3,qty:3},{id:3,date:"2026-08-19",product:2,qty:2},
-{id:4,date:"2026-08-19",product:5,qty:4},{id:5,date:"2026-08-18",product:4,qty:3},{id:6,date:"2026-08-18",product:7,qty:5}],transactions:[
-{id:1,date:"2026-08-20",type:"entrada",cat:"Vendas",desc:"Vendas do dia",value:1240},
-{id:2,date:"2026-08-19",type:"entrada",cat:"Vendas",desc:"Vendas do dia",value:980},
-{id:3,date:"2026-08-18",type:"entrada",cat:"Vendas",desc:"Vendas do dia",value:1120},
-{id:4,date:"2026-08-18",type:"saida",cat:"Insumos",desc:"Compra de frango",value:540},
-{id:5,date:"2026-08-17",type:"saida",cat:"Insumos",desc:"Compra de batata",value:280},
-{id:6,date:"2026-08-15",type:"saida",cat:"Mão de obra",desc:"Folha",value:5200},
-{id:7,date:"2026-08-10",type:"saida",cat:"Despesas",desc:"Energia",value:780}],purchases:[]};
-let S=JSON.parse(localStorage.getItem("mixPro")||"null")||structuredClone(DEMO), charts={};
-const $=id=>document.getElementById(id), money=n=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(n||0), pct=n=>(n||0).toFixed(1).replace(".",",")+"%", ing=id=>S.ingredients.find(x=>x.id==id), prod=id=>S.products.find(x=>x.id==id);
-const cost=p=>(p.recipe||[]).reduce((a,r)=>a+(ing(r.i)?.price||0)*r.q,0), cmv=p=>p.price?cost(p)/p.price*100:0, markup=p=>cost(p)?p.price/cost(p):0, save=()=>localStorage.setItem("mixPro",JSON.stringify(S));
-const nav=[["dashboard","⌂","Início"],["vendas","＋","Vendas"],["financeiro","R$","Financeiro"],["compras","▤","Compras"],["insumos","◫","Insumos"],["estoque","□","Estoque"],["fichas","⚖","Fichas"],["relatorios","▥","Relatórios"]];
-function buildNav(){let a=$("sideNav"),b=$("bottomNav");a.innerHTML=nav.map(n=>`<button class="navbtn" data-go="${n[0]}">${n[1]} <span>${n[2]}</span></button>`).join("");b.innerHTML=nav.slice(0,5).map(n=>`<button data-go="${n[0]}"><span class="nav-icon">${n[1]}</span>${n[2]}</button>`).join("")+`<button data-go="mais"><span class="nav-icon">•••</span>Mais</button>`;document.querySelectorAll("[data-go]").forEach(x=>x.onclick=()=>go(x.dataset.go))}
-function go(id){if(id==="mais")id="estoque";document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id===id));document.querySelectorAll("[data-go]").forEach(x=>x.classList.toggle("active",x.dataset.go===id));$("title").textContent=({dashboard:"Dashboard",vendas:"Vendas",financeiro:"Financeiro",compras:"Compras",insumos:"Insumos",estoque:"Estoque",fichas:"Fichas técnicas",produtos:"Produtos",relatorios:"Relatórios",config:"Configurações"})[id]||"Estoque";render()}
-function toast(x){let t=$("toast");t.textContent=x;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2000)}
-function modal(title,body,cb){$("modalTitle").textContent=title;$("form").innerHTML=body;$("modal").classList.remove("hidden");$("form").onsubmit=e=>{e.preventDefault();cb(new FormData(e.target));close()}}
-function close(){$("modal").classList.add("hidden")}$("close").onclick=close;
-function periodTx(){let d=+ $("period").value, start=new Date();start.setDate(start.getDate()-d);return S.transactions.filter(t=>new Date(t.date)>=start)}
-function revenue(){return S.sales.reduce((a,s)=>a+prod(s.product).price*s.qty,0)}
-function dashboard(){let tx=periodTx(),rev=tx.filter(t=>t.type==="entrada"&&t.cat==="Vendas").reduce((a,t)=>a+t.value,0),cm=tx.filter(t=>t.type==="saida"&&t.cat==="Insumos").reduce((a,t)=>a+t.value,0),lab=tx.filter(t=>t.type==="saida"&&t.cat==="Mão de obra").reduce((a,t)=>a+t.value,0),orders=S.sales.reduce((a,s)=>a+s.qty,0),margin=rev?((rev-cm-lab)/rev*100):0;
-$("mRevenue").textContent=money(rev);$("mCMV").textContent=pct(rev?cm/rev*100:0);$("mCMVSub").textContent=money(cm);$("mCMO").textContent=pct(rev?lab/rev*100:0);$("mCMOSub").textContent=money(lab);$("mMargin").textContent=pct(margin);$("mMarginSub").textContent=money(rev-cm-lab);$("mTicket").textContent=money(orders?rev/orders:0);$("mOrders").textContent=orders+" unidades";
-$("alerts").innerHTML=S.ingredients.filter(i=>i.stock<=i.min).map(i=>`<div class="alert"><span>${i.name}</span><b>${i.stock} ${i.unit}</b></div>`).join("")||`<p class="muted">Nenhum item crítico.</p>`;
-Object.values(charts).forEach(c=>c.destroy());charts={};let labels=["1","2","3","4","5","6","7"],base=rev||6000;
-charts.s=new Chart($("salesChart"),{type:"line",data:{labels:labels.map(x=>"Sem. "+x),datasets:[{label:"Faturamento",data:labels.map((_,i)=>base*(.7+i*.05)),tension:.3},{label:"Custos",data:labels.map((_,i)=>(cm+lab||base*.6)*(.75+i*.035)),tension:.3}]},options:{responsive:true,plugins:{legend:{position:"bottom"}}}});
-charts.c=new Chart($("costChart"),{type:"doughnut",data:{labels:["CMV","CMO","Outros"],datasets:[{data:[cm,lab,Math.max(0,rev-cm-lab-margin*rev/100)]}]},options:{plugins:{legend:{position:"bottom"}}}});
-let top=[...S.products].sort((a,b)=>b.sold-a.sold).slice(0,6);charts.t=new Chart($("topChart"),{type:"bar",data:{labels:top.map(p=>p.name),datasets:[{label:"Unidades",data:top.map(p=>p.sold)}]},options:{indexAxis:"y",plugins:{legend:{display:false}}}});
+// ============================================================
+//  app.js – Lógica completa do "Minha Saúde"
+// ============================================================
+
+// ---------- DADOS INICIAIS (se não houver no localStorage) ----------
+const DADOS_PADRAO = {
+  especialidades: [
+    { id: 'cardiologia', nome: 'Cardiologia', icone: '❤️' },
+    { id: 'gastro', nome: 'Gastroenterologia', icone: '🍽️' },
+    { id: 'oftalmo', nome: 'Oftalmologia', icone: '👁️' },
+    { id: 'ortopedia', nome: 'Ortopedia', icone: '🦴' },
+    { id: 'dermatologia', nome: 'Dermatologia', icone: '🧴' },
+    { id: 'neurologia', nome: 'Neurologia', icone: '🧠' },
+    { id: 'ginecologia', nome: 'Ginecologia', icone: '👩‍⚕️' },
+    { id: 'urologia', nome: 'Urologia', icone: '🔬' }
+  ],
+  // Dados por especialidade
+  historico: {
+    cardiologia: { consultas: [], exames: [], proximaConsulta: null, recomendacoes: { melhorar: '', fazer: '', medicamentos: '' } },
+    gastro: { consultas: [], exames: [], proximaConsulta: null, recomendacoes: { melhorar: '', fazer: '', medicamentos: '' } },
+    oftalmo: { consultas: [], exames: [], proximaConsulta: null, recomendacoes: { melhorar: '', fazer: '', medicamentos: '' } },
+    ortopedia: { consultas: [], exames: [], proximaConsulta: null, recomendacoes: { melhorar: '', fazer: '', medicamentos: '' } },
+    dermatologia: { consultas: [], exames: [], proximaConsulta: null, recomendacoes: { melhorar: '', fazer: '', medicamentos: '' } },
+    neurologia: { consultas: [], exames: [], proximaConsulta: null, recomendacoes: { melhorar: '', fazer: '', medicamentos: '' } },
+    ginecologia: { consultas: [], exames: [], proximaConsulta: null, recomendacoes: { melhorar: '', fazer: '', medicamentos: '' } },
+    urologia: { consultas: [], exames: [], proximaConsulta: null, recomendacoes: { melhorar: '', fazer: '', medicamentos: '' } }
+  },
+  examesSangue: [] // array de { data, parametros: { hemoglobina, glicose, colesterol, ... } }
+};
+
+// ---------- GERENCIAMENTO DE DADOS ----------
+function carregarDados() {
+  const dados = localStorage.getItem('minhaSaude');
+  if (dados) {
+    try {
+      return JSON.parse(dados);
+    } catch (e) {
+      console.warn('Erro ao parsear dados, usando padrão');
+      return JSON.parse(JSON.stringify(DADOS_PADRAO));
+    }
+  }
+  return JSON.parse(JSON.stringify(DADOS_PADRAO));
 }
-function sales(){let today=new Date().toISOString().slice(0,10),ts=S.sales.filter(s=>s.date===today),r=ts.reduce((a,s)=>a+prod(s.product).price*s.qty,0);$("todayRevenue").textContent=money(r);$("todayOrders").textContent=ts.reduce((a,s)=>a+s.qty,0);$("todayTicket").textContent=money(ts.length?r/ts.reduce((a,s)=>a+s.qty,0):0);let q=($("saleSearch").value||"").toLowerCase();$("salesTable").innerHTML=S.sales.slice().reverse().filter(s=>prod(s.product).name.toLowerCase().includes(q)).map(s=>{let p=prod(s.product),tot=p.price*s.qty;return`<tr><td>${s.date}</td><td>${p.name}</td><td>${s.qty}</td><td>${money(p.price)}</td><td>${money(tot)}</td><td>${pct(cmv(p))}</td><td><button class="icon-btn delete" onclick="delSale(${s.id})">×</button></td></tr>`}).join("")}
-function finance(){let ins=S.transactions.filter(t=>t.type==="entrada").reduce((a,t)=>a+t.value,0),out=S.transactions.filter(t=>t.type==="saida").reduce((a,t)=>a+t.value,0);$("finIn").textContent=money(ins);$("finOut").textContent=money(out);$("finNet").textContent=money(ins-out);let q=($("txSearch").value||"").toLowerCase();$("txTable").innerHTML=S.transactions.slice().reverse().filter(t=>(t.desc+" "+t.cat).toLowerCase().includes(q)).map(t=>`<tr><td>${t.date}</td><td>${t.type==="entrada"?"Entrada":"Saída"}</td><td>${t.cat}</td><td>${t.desc}</td><td class="${t.type==="entrada"?"positive":"negative"}">${money(t.value)}</td><td><button class="icon-btn delete" onclick="delTx(${t.id})">×</button></td></tr>`).join("")}
-function ingredients(){let q=($("ingredientSearch").value||"").toLowerCase();$("ingredientTable").innerHTML=S.ingredients.filter(i=>i.name.toLowerCase().includes(q)).map(i=>`<tr><td>${i.name}</td><td>${i.unit}</td><td>${money(i.price)}</td><td>${i.supplier}</td><td>${i.stock}</td><td>${i.min}</td><td><button class="icon-btn" onclick="editIng(${i.id})">✎</button><button class="icon-btn delete" onclick="delIng(${i.id})">×</button></td></tr>`).join("")}
-function stock(){let val=S.ingredients.reduce((a,i)=>a+i.stock*i.price,0),low=S.ingredients.filter(i=>i.stock<=i.min).length;$("stockValue").textContent=money(val);$("stockCount").textContent=S.ingredients.length;$("stockCritical").textContent=low;let q=($("stockSearch").value||"").toLowerCase();$("stockTable").innerHTML=S.ingredients.filter(i=>i.name.toLowerCase().includes(q)).map(i=>`<tr><td>${i.name}</td><td>${i.stock}</td><td>${i.unit}</td><td>${money(i.price)}</td><td>${money(i.stock*i.price)}</td><td><span class="tag ${i.stock<=i.min?"low":"ok"}">${i.stock<=i.min?"Repor":"OK"}</span></td><td><button class="icon-btn" onclick="move(${i.id})">Mov.</button></td></tr>`).join("")}
-function recipes(){let html=S.products.map(p=>`<article class="recipe"><div class="panel-title"><div><h3>${p.name}</h3><span class="badge">${p.sold} vendidos</span></div><button class="icon-btn" onclick="editProduct(${p.id})">✎</button></div><div class="recipe-price">${money(p.price)}</div>${p.recipe.map(r=>`<div class="recipe-line"><span>${ing(r.i)?.name||"—"} × ${r.q}</span><b>${money((ing(r.i)?.price||0)*r.q)}</b></div>`).join("")}<div class="recipe-total"><span>Custo</span><b>${money(cost(p))}</b></div><div class="recipe-total"><span>CMV</span><b>${pct(cmv(p))}</b></div><div class="recipe-total"><span>Markup</span><b>${markup(p).toFixed(2)}x</b></div></article>`).join("");$("recipeGrid").innerHTML=html}
-function products(){ $("productTable").innerHTML=S.products.map(p=>`<tr><td>${p.name}</td><td>${money(p.price)}</td><td>${money(cost(p))}</td><td>${pct(cmv(p))}</td><td>${markup(p).toFixed(2)}x</td><td>${money(p.price-cost(p))}</td><td>${p.sold}</td><td><button class="icon-btn" onclick="editProduct(${p.id})">✎</button><button class="icon-btn delete" onclick="delProduct(${p.id})">×</button></td></tr>`).join("")}
-function reports(){$("profitTable").innerHTML=S.products.slice().sort((a,b)=>cmv(a)-cmv(b)).map(p=>`<tr><td>${p.name}</td><td>${money(p.price)}</td><td>${money(cost(p))}</td><td>${money(p.price-cost(p))}</td><td>${pct(cmv(p))}</td></tr>`).join("");let rev=revenue(),c=S.products.reduce((a,p)=>a+cost(p)*p.sold,0),ticket=S.sales.length?rev/S.sales.reduce((a,s)=>a+s.qty,0):0;$("indicators").innerHTML=[["Faturamento acumulado",money(rev)],["CMV teórico por vendas",pct(rev?c/rev*100:0)],["Ticket médio",money(ticket)],["Produto com melhor margem",[...S.products].sort((a,b)=>(b.price-cost(b))-(a.price-cost(a)))[0]?.name||"—"],["Produtos cadastrados",S.products.length]].map(x=>`<div class="indicator"><span>${x[0]}</span><b>${x[1]}</b></div>`).join("")}
-function config(){ $("cfgLabor").value=S.config.labor;$("cfgFixed").value=S.config.fixed;$("cfgTarget").value=S.config.target}
-function purchases(){ $("purchaseTable").innerHTML=S.purchases.slice().reverse().map(p=>`<tr><td>${p.date}</td><td>${ing(p.i)?.name}</td><td>${p.q}</td><td>${money(p.unit)}</td><td>${money(p.q*p.unit)}</td><td>${p.supplier||"—"}</td><td><button class="icon-btn delete" onclick="delPurchase(${p.id})">×</button></td></tr>`).join("")}
-function render(){dashboard();sales();finance();ingredients();stock();recipes();products();reports();config();purchases()}
-function newSale(){modal("Registrar venda",`<div class="form-grid"><label>Data<input name="date" type="date" value="${new Date().toISOString().slice(0,10)}" required></label><label>Produto<select name="product">${S.products.map(p=>`<option value="${p.id}">${p.name} — ${money(p.price)}</option>`).join("")}</select></label><label>Quantidade<input name="qty" type="number" min="1" value="1" required></label></div><button class="primary">Registrar</button>`,d=>{let p=prod(d.get("product")),q=+d.get("qty"),date=d.get("date");S.sales.push({id:Date.now(),date,product:+d.get("product"),qty:q});p.sold+=q;S.transactions.push({id:Date.now()+1,date,type:"entrada",cat:"Vendas",desc:p.name,value:p.price*q});p.recipe.forEach(r=>{let i=ing(r.i);i.stock=Math.max(0,i.stock-r.q*q)});save();toast("Venda registrada e estoque baixado");render()})}
-function newTx(){modal("Novo lançamento",`<div class="form-row"><label>Data<input name="date" type="date" value="${new Date().toISOString().slice(0,10)}"></label><label>Tipo<select name="type"><option value="entrada">Entrada</option><option value="saida">Saída</option></select></label></div><label>Categoria<select name="cat"><option>Vendas</option><option>Insumos</option><option>Mão de obra</option><option>Despesas</option><option>Impostos</option><option>Marketing</option><option>Outros</option></select></label><label>Descrição<input name="desc" required></label><label>Valor<input name="value" type="number" step=".01" min="0" required></label><button class="primary">Salvar</button>`,d=>{S.transactions.push({id:Date.now(),date:d.get("date"),type:d.get("type"),cat:d.get("cat"),desc:d.get("desc"),value:+d.get("value")});save();toast("Lançamento salvo");render()})}
-function newIngredient(old){let i=old||{id:Date.now(),name:"",unit:"kg",price:0,supplier:"",stock:0,min:0};modal(old?"Editar insumo":"Novo insumo",`<label>Nome<input name="name" value="${i.name}" required></label><div class="form-row"><label>Unidade<select name="unit"><option>kg</option><option>g</option><option>L</option><option>un</option></select></label><label>Preço unitário<input name="price" type="number" step=".0001" value="${i.price}"></label></div><label>Fornecedor<input name="supplier" value="${i.supplier}"></label><div class="form-row"><label>Estoque<input name="stock" type="number" step=".001" value="${i.stock}"></label><label>Mínimo<input name="min" type="number" step=".001" value="${i.min}"></label></div><button class="primary">Salvar</button>`,d=>{Object.assign(i,{name:d.get("name"),unit:d.get("unit"),price:+d.get("price"),supplier:d.get("supplier"),stock:+d.get("stock"),min:+d.get("min")});if(!old)S.ingredients.push(i);save();toast("Insumo salvo");render()})}
-function newPurchase(){modal("Nova compra",`<label>Data<input name="date" type="date" value="${new Date().toISOString().slice(0,10)}"></label><label>Insumo<select name="i">${S.ingredients.map(i=>`<option value="${i.id}">${i.name}</option>`).join("")}</select></label><div class="form-row"><label>Quantidade<input name="q" type="number" step=".001" min=".001" required></label><label>Preço unitário<input name="unit" type="number" step=".0001" min="0" required></label></div><label>Fornecedor<input name="supplier"></label><button class="primary">Registrar compra</button>`,d=>{let q=+d.get("q"),u=+d.get("unit"),i=ing(d.get("i"));i.stock+=q;i.price=u;S.purchases.push({id:Date.now(),date:d.get("date"),i:+d.get("i"),q,unit:u,supplier:d.get("supplier")});S.transactions.push({id:Date.now()+1,date:d.get("date"),type:"saida",cat:"Insumos",desc:"Compra de "+i.name,value:q*u});save();toast("Compra registrada e estoque atualizado");render()})}
-function move(id){let i=ing(id);modal("Movimentar estoque",`<label>Insumo<input value="${i.name}" disabled></label><div class="form-row"><label>Tipo<select name="type"><option value="in">Entrada</option><option value="out">Saída</option><option value="loss">Perda</option></select></label><label>Quantidade<input name="q" type="number" step=".001" min=".001" required></label></div><button class="primary">Aplicar</button>`,d=>{let q=+d.get("q");i.stock=Math.max(0,i.stock+(d.get("type")==="in"?q:-q));save();toast("Estoque atualizado");render()})}
-function newProduct(old){let p=old||{id:Date.now(),name:"",price:0,sold:0,recipe:[{i:S.ingredients[0]?.id,q:0}]};modal(old?"Editar produto":"Nova ficha técnica",`<label>Produto<input name="name" value="${p.name}" required></label><div class="form-row"><label>Preço de venda<input name="price" type="number" step=".01" value="${p.price}"></label><label>Vendidos<input name="sold" type="number" value="${p.sold}"></label></div><div id="recipeFields">${p.recipe.map((r,n)=>`<div class="form-row r"><label>Insumo<select name="i${n}">${S.ingredients.map(i=>`<option value="${i.id}" ${i.id==r.i?"selected":""}>${i.name}</option>`).join("")}</select></label><label>Quantidade<input name="q${n}" type="number" step=".001" value="${r.q}"></label></div>`).join("")}</div><button type="button" class="secondary" id="addIngRow">+ Ingrediente</button><button class="primary">Salvar ficha</button>`,d=>{let n=document.querySelectorAll("#recipeFields .r").length;let recipe=[];for(let j=0;j<n;j++)recipe.push({i:+d.get("i"+j),q:+d.get("q"+j)});Object.assign(p,{name:d.get("name"),price:+d.get("price"),sold:+d.get("sold"),recipe});if(!old)S.products.push(p);save();toast("Ficha técnica salva");render()});$("addIngRow").onclick=()=>{let n=document.querySelectorAll("#recipeFields .r").length;$("recipeFields").insertAdjacentHTML("beforeend",`<div class="form-row r"><label>Insumo<select name="i${n}">${S.ingredients.map(i=>`<option value="${i.id}">${i.name}</option>`).join("")}</select></label><label>Quantidade<input name="q${n}" type="number" step=".001" value="0"></label></div>`)}}
-window.delSale=id=>{if(confirm("Excluir venda?")){S.sales=S.sales.filter(x=>x.id!==id);save();render()}};window.delTx=id=>{if(confirm("Excluir lançamento?")){S.transactions=S.transactions.filter(x=>x.id!==id);save();render()}};window.editIng=id=>newIngredient(ing(id));window.delIng=id=>{if(confirm("Excluir insumo?")){S.ingredients=S.ingredients.filter(x=>x.id!=id);save();render()}};window.move=move;window.editProduct=id=>newProduct(prod(id));window.delProduct=id=>{if(confirm("Excluir produto?")){S.products=S.products.filter(x=>x.id!=id);save();render()}};window.delPurchase=id=>{if(confirm("Excluir compra do histórico? Isso não desfaz o estoque automaticamente.")){S.purchases=S.purchases.filter(x=>x.id!=id);save();render()}};
-function backup(){let a=document.createElement("a"),b=new Blob([JSON.stringify(S,null,2)],{type:"application/json"});a.href=URL.createObjectURL(b);a.download="mix-chicken-backup.json";a.click();URL.revokeObjectURL(a.href)}
-$("newSale").onclick=newSale;$("quickSale").onclick=newSale;$("newTx").onclick=newTx;$("newIngredient").onclick=()=>newIngredient();$("newPurchase").onclick=newPurchase;$("newMovement").onclick=()=>move(S.ingredients[0]?.id);$("newProduct").onclick=()=>newProduct();$("newProduct2").onclick=()=>newProduct();$("period").onchange=render;["saleSearch","txSearch","ingredientSearch","stockSearch"].forEach(x=>$(x).oninput=render);
-$("saveCfg").onclick=()=>{S.config.labor=+$("cfgLabor").value;S.config.fixed=+$("cfgFixed").value;S.config.target=+$("cfgTarget").value;save();toast("Configurações salvas");render()};
-$("exportBtn").onclick=backup;$("export2").onclick=backup;$("importBtn").onclick=()=>$("fileInput").click();$("fileInput").onchange=e=>{let f=e.target.files[0];if(!f)return;let r=new FileReader;r.onload=()=>{try{S=JSON.parse(r.result);save();render();toast("Backup restaurado")}catch{toast("Arquivo inválido")}};r.readAsText(f)};
-$("reset").onclick=()=>{if(confirm("Restaurar os dados de demonstração?")){S=structuredClone(DEMO);save();render();toast("Dados restaurados")}};$("printReport").onclick=()=>window.print();
-buildNav();go("dashboard");
+
+function salvarDados(dados) {
+  localStorage.setItem('minhaSaude', JSON.stringify(dados));
+}
+
+let dados = carregarDados();
+
+// ---------- REFERÊNCIAS DOM ----------
+const contentArea = document.getElementById('contentArea');
+const pageTitle = document.getElementById('pageTitle');
+const especialidadesList = document.getElementById('especialidades-list');
+const sidebar = document.getElementById('sidebar');
+const menuToggle = document.getElementById('menuToggle');
+
+// ---------- RENDERIZAÇÃO DO MENU LATERAL ----------
+function renderizarMenu() {
+  // Limpa a lista de especialidades (mantém o título "Especialidades")
+  const div = document.getElementById('especialidades-list');
+  div.innerHTML = '';
+  dados.especialidades.forEach(esp => {
+    const li = document.createElement('li');
+    li.className = 'nav-item';
+    li.dataset.page = esp.id;
+    li.innerHTML = `<span class="icon">${esp.icone}</span> ${esp.nome}`;
+    li.addEventListener('click', () => {
+      navegarPara(esp.id);
+      fecharMenuMobile();
+    });
+    div.appendChild(li);
+  });
+
+  // Eventos para os itens fixos
+  document.querySelectorAll('.nav-item[data-page]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      const page = el.dataset.page;
+      navegarPara(page);
+      fecharMenuMobile();
+    });
+  });
+}
+
+function fecharMenuMobile() {
+  if (window.innerWidth <= 768) {
+    sidebar.classList.remove('open');
+  }
+}
+
+// ---------- NAVEGAÇÃO ----------
+function navegarPara(pagina) {
+  // Atualiza active no menu
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  const target = document.querySelector(`.nav-item[data-page="${pagina}"]`);
+  if (target) target.classList.add('active');
+
+  if (pagina === 'dashboard') {
+    renderizarDashboard();
+    pageTitle.textContent = 'Dashboard';
+  } else if (pagina === 'exames-sangue') {
+    renderizarExamesSangue();
+    pageTitle.textContent = '🧪 Exames de Sangue';
+  } else {
+    // especialidade
+    const esp = dados.especialidades.find(e => e.id === pagina);
+    if (esp) {
+      renderizarEspecialidade(esp.id);
+      pageTitle.textContent = `${esp.icone} ${esp.nome}`;
+    }
+  }
+}
+
+// ---------- DASHBOARD ----------
+function renderizarDashboard() {
+  const hoje = new Date();
+  const hojeStr = hoje.toISOString().slice(0,10);
+
+  let html = `<h2 style="font-weight:300; margin-bottom:8px;">📋 Visão Geral</h2>
+              <div class="dashboard-grid">`;
+
+  dados.especialidades.forEach(esp => {
+    const hist = dados.historico[esp.id] || { consultas: [], exames: [], proximaConsulta: null };
+    const ultimaConsulta = hist.consultas.length > 0 ? hist.consultas[hist.consultas.length - 1] : null;
+    const prox = hist.proximaConsulta;
+
+    let ultimaStr = 'Nunca';
+    if (ultimaConsulta) {
+      const d = new Date(ultimaConsulta.data);
+      ultimaStr = d.toLocaleDateString('pt-BR');
+    }
+
+    let diasFaltam = '--';
+    if (prox && prox.data) {
+      const proxDate = new Date(prox.data);
+      const diff = Math.ceil((proxDate - hoje) / (1000 * 60 * 60 * 24));
+      diasFaltam = diff >= 0 ? diff : 'Atrasado';
+    }
+
+    html += `
+      <div class="card" onclick="navegarPara('${esp.id}')" style="cursor:pointer;">
+        <h3>${esp.icone} ${esp.nome}</h3>
+        <div class="info-line"><span class="label">Última visita</span><span class="value">${ultimaStr}</span></div>
+        <div class="info-line"><span class="label">Próxima consulta</span><span class="value ${typeof diasFaltam === 'number' && diasFaltam <= 7 ? 'highlight' : ''}">${diasFaltam === '--' ? 'Não agendada' : diasFaltam + ' dias'}</span></div>
+        <div style="margin-top:8px; font-size:0.9rem; color:#7f8c8d;">${hist.exames.length} exames registrados</div>
+      </div>
+    `;
+  });
+
+  html += `</div>`;
+
+  // Adiciona um card de resumo de exames de sangue
+  const ultimoSangue = dados.examesSangue.length > 0 ? dados.examesSangue[dados.examesSangue.length - 1] : null;
+  html += `
+    <div class="card" style="margin-top:20px;" onclick="navegarPara('exames-sangue')" style="cursor:pointer;">
+      <h3>🧪 Exames de Sangue</h3>
+      <div class="info-line"><span class="label">Último exame</span><span class="value">${ultimoSangue ? new Date(ultimoSangue.data).toLocaleDateString('pt-BR') : 'Nenhum'}</span></div>
+      <div class="info-line"><span class="label">Total de exames</span><span class="value">${dados.examesSangue.length}</span></div>
+    </div>
+  `;
+
+  contentArea.innerHTML = html;
+  document.getElementById('currentDate').textContent = hoje.toLocaleDateString('pt-BR');
+}
+
+// ---------- ESPECIALIDADE ----------
+function renderizarEspecialidade(id) {
+  const esp = dados.especialidades.find(e => e.id === id);
+  if (!esp) return;
+  const hist = dados.historico[id] || { consultas: [], exames: [], proximaConsulta: null, recomendacoes: { melhorar: '', fazer: '', medicamentos: '' } };
+
+  // Contador regressivo
+  let countdownHtml = '';
+  if (hist.proximaConsulta && hist.proximaConsulta.data) {
+    const proxDate = new Date(hist.proximaConsulta.data);
+    const hoje = new Date();
+    const diff = Math.ceil((proxDate - hoje) / (1000 * 60 * 60 * 24));
+    countdownHtml = `<div class="countdown">${diff >= 0 ? diff + ' dias' : 'Atrasado!'}</div>`;
+  } else {
+    countdownHtml = `<div class="countdown" style="background:#ecf0f1; color:#7f8c8d;">Não agendada</div>`;
+  }
+
+  let html = `
+    <div class="especialidade-header">
+      <h2>${esp.icone} ${esp.nome}</h2>
+      <div>${countdownHtml}</div>
+    </div>
+  `;
+
+  // ---- Consultas ----
+  html += `<div class="section-block">
+    <h3>📅 Consultas <span class="badge">${hist.consultas.length}</span></h3>
+    <div class="item-list">`;
+  if (hist.consultas.length === 0) {
+    html += `<div style="color:#95a5a6; padding:8px 0;">Nenhuma consulta registrada.</div>`;
+  } else {
+    hist.consultas.slice().reverse().forEach((c, idx) => {
+      const d = new Date(c.data);
+      html += `
+        <div class="item-row">
+          <div class="item-info">
+            <span class="desc">${c.medico || 'Médico não informado'}</span>
+            <span class="date">${d.toLocaleDateString('pt-BR')} ${c.observacoes ? '– ' + c.observacoes : ''}</span>
+          </div>
+          <div class="item-actions">
+            <button class="btn btn-sm btn-danger" onclick="removerConsulta('${id}', ${idx})">✕</button>
+          </div>
+        </div>
+      `;
+    });
+  }
+  html += `</div>
+    <div class="inline-form">
+      <input type="date" id="consultaData" value="${new Date().toISOString().slice(0,10)}" />
+      <input type="text" id="consultaMedico" placeholder="Nome do médico" />
+      <input type="text" id="consultaObs" placeholder="Observações (opcional)" />
+      <button class="btn btn-success" onclick="adicionarConsulta('${id}')">+ Adicionar</button>
+    </div>
+  </div>`;
+
+  // ---- Exames (com upload) ----
+  html += `<div class="section-block">
+    <h3>📄 Exames Realizados <span class="badge">${hist.exames.length}</span></h3>
+    <div class="item-list">`;
+  if (hist.exames.length === 0) {
+    html += `<div style="color:#95a5a6; padding:8px 0;">Nenhum exame registrado.</div>`;
+  } else {
+    hist.exames.slice().reverse().forEach((ex, idx) => {
+      const d = new Date(ex.data);
+      html += `
+        <div class="item-row">
+          <div class="item-info">
+            <span class="desc">${ex.nome || 'Exame'}</span>
+            <span class="date">${d.toLocaleDateString('pt-BR')}</span>
+            ${ex.arquivo ? `<span style="font-size:0.8rem; color:#3498db;">📎 Anexo</span>` : ''}
+          </div>
+          <div class="item-actions">
+            ${ex.arquivo ? `<button class="btn btn-sm btn-secondary" onclick="baixarArquivo('${id}', ${idx})">📥</button>` : ''}
+            <button class="btn btn-sm btn-danger" onclick="removerExame('${id}', ${idx})">✕</button>
+          </div>
+        </div>
+      `;
+    });
+  }
+  html += `</div>
+    <div class="upload-area" id="uploadArea_${id}">
+      <span class="upload-label">📎 Clique ou arraste para anexar exame (PDF, PNG, JPEG)</span>
+      <input type="file" id="fileInput_${id}" accept=".pdf,.png,.jpg,.jpeg" multiple />
+    </div>
+    <div class="inline-form">
+      <input type="date" id="exameData_${id}" value="${new Date().toISOString().slice(0,10)}" />
+      <input type="text" id="exameNome_${id}" placeholder="Nome do exame" />
+      <button class="btn btn-success" onclick="adicionarExame('${id}')">+ Adicionar sem anexo</button>
+    </div>
+  </div>`;
+
+  // ---- Agendamento próxima consulta ----
+  const prox = hist.proximaConsulta || { data: '', descricao: '' };
+  html += `<div class="section-block">
+    <h3>📆 Agendamento da Próxima Consulta</h3>
+    <div class="inline-form">
+      <input type="date" id="proxData_${id}" value="${prox.data || ''}" />
+      <input type="text" id="proxDesc_${id}" placeholder="Descrição (opcional)" value="${prox.descricao || ''}" />
+      <button class="btn btn-primary" onclick="salvarProximaConsulta('${id}')">Salvar</button>
+      ${prox.data ? `<button class="btn btn-danger" onclick="removerProximaConsulta('${id}')">Remover</button>` : ''}
+    </div>
+  </div>`;
+
+  // ---- Recomendações ----
+  const rec = hist.recomendacoes || { melhorar: '', fazer: '', medicamentos: '' };
+  html += `<div class="section-block">
+    <h3>💡 Recomendações de Saúde</h3>
+    <div style="display:flex; flex-direction:column; gap:12px;">
+      <div><label style="font-weight:500;">🔹 O que melhorar:</label><br>
+        <textarea id="recMelhorar_${id}" rows="2" style="width:100%; padding:8px; border:1px solid #dce1e8; border-radius:8px;">${rec.melhorar || ''}</textarea>
+      </div>
+      <div><label style="font-weight:500;">🔸 O que fazer:</label><br>
+        <textarea id="recFazer_${id}" rows="2" style="width:100%; padding:8px; border:1px solid #dce1e8; border-radius:8px;">${rec.fazer || ''}</textarea>
+      </div>
+      <div><label style="font-weight:500;">💊 Medicamentos:</label><br>
+        <textarea id="recMedicamentos_${id}" rows="2" style="width:100%; padding:8px; border:1px solid #dce1e8; border-radius:8px;">${rec.medicamentos || ''}</textarea>
+      </div>
+      <button class="btn btn-primary" onclick="salvarRecomendacoes('${id}')">Salvar Recomendações</button>
+    </div>
+  </div>`;
+
+  contentArea.innerHTML = html;
+
+  // Configurar upload de arquivos
+  const fileInput = document.getElementById(`fileInput_${id}`);
+  const uploadArea = document.getElementById(`uploadArea_${id}`);
+  if (fileInput && uploadArea) {
+    fileInput.addEventListener('change', (e) => {
+      const files = e.target.files;
+      for (let f of files) {
+        processarArquivo(id, f);
+      }
+      fileInput.value = '';
+    });
+    uploadArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadArea.style.borderColor = '#2ecc71';
+    });
+    uploadArea.addEventListener('dragleave', () => {
+      uploadArea.style.borderColor = '#bdc3c7';
+    });
+    uploadArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadArea.style.borderColor = '#bdc3c7';
+      const files = e.dataTransfer.files;
+      for (let f of files) {
+        processarArquivo(id, f);
+      }
+    });
+    uploadArea.addEventListener('click', () => fileInput.click());
+  }
+
+  // Atualizar contador regressivo periodicamente
+  if (hist.proximaConsulta && hist.proximaConsulta.data) {
+    iniciarContador(id);
+  }
+}
+
+// ---------- FUNÇÕES DE MANIPULAÇÃO (ESPECIALIDADE) ----------
+function adicionarConsulta(id) {
+  const data = document.getElementById('consultaData').value;
+  const medico = document.getElementById('consultaMedico').value.trim() || 'Médico';
+  const obs = document.getElementById('consultaObs').value.trim();
+  if (!data) return alert('Selecione uma data.');
+  const hist = dados.historico[id];
+  hist.consultas.push({ data, medico, observacoes: obs });
+  salvarDados(dados);
+  renderizarEspecialidade(id);
+}
+
+function removerConsulta(id, index) {
+  const hist = dados.historico[id];
+  // index é relativo ao array invertido, precisamos do índice real
+  const realIndex = hist.consultas.length - 1 - index;
+  if (realIndex >= 0 && realIndex < hist.consultas.length) {
+    hist.consultas.splice(realIndex, 1);
+    salvarDados(dados);
+    renderizarEspecialidade(id);
+  }
+}
+
+function processarArquivo(id, file) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const base64 = e.target.result;
+    const nome = file.name;
+    const data = new Date().toISOString().slice(0,10);
+    const hist = dados.historico[id];
+    hist.exames.push({
+      data,
+      nome: nome,
+      arquivo: base64,
+      tipo: file.type
+    });
+    salvarDados(dados);
+    renderizarEspecialidade(id);
+  };
+  reader.readAsDataURL(file);
+}
+
+function adicionarExame(id) {
+  const data = document.getElementById(`exameData_${id}`).value;
+  const nome = document.getElementById(`exameNome_${id}`).value.trim() || 'Exame';
+  if (!data) return alert('Selecione uma data.');
+  const hist = dados.historico[id];
+  hist.exames.push({ data, nome, arquivo: null });
+  salvarDados(dados);
+  renderizarEspecialidade(id);
+}
+
+function removerExame(id, index) {
+  const hist = dados.historico[id];
+  const realIndex = hist.exames.length - 1 - index;
+  if (realIndex >= 0 && realIndex < hist.exames.length) {
+    hist.exames.splice(realIndex, 1);
+    salvarDados(dados);
+    renderizarEspecialidade(id);
+  }
+}
+
+function baixarArquivo(id, index) {
+  const hist = dados.historico[id];
+  const realIndex = hist.exames.length - 1 - index;
+  const exame = hist.exames[realIndex];
+  if (exame && exame.arquivo) {
+    const link = document.createElement('a');
+    link.href = exame.arquivo;
+    link.download = exame.nome || 'exame';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+}
+
+function salvarProximaConsulta(id) {
+  const data = document.getElementById(`proxData_${id}`).value;
+  const desc = document.getElementById(`proxDesc_${id}`).value.trim();
+  if (!data) return alert('Selecione uma data.');
+  const hist = dados.historico[id];
+  hist.proximaConsulta = { data, descricao: desc };
+  salvarDados(dados);
+  renderizarEspecialidade(id);
+}
+
+function removerProximaConsulta(id) {
+  const hist = dados.historico[id];
+  hist.proximaConsulta = null;
+  salvarDados(dados);
+  renderizarEspecialidade(id);
+}
+
+function salvarRecomendacoes(id) {
+  const melhorar = document.getElementById(`recMelhorar_${id}`).value;
+  const fazer = document.getElementById(`recFazer_${id}`).value;
+  const medicamentos = document.getElementById(`recMedicamentos_${id}`).value;
+  const hist = dados.historico[id];
+  hist.recomendacoes = { melhorar, fazer, medicamentos };
+  salvarDados(dados);
+  alert('Recomendações salvas!');
+}
+
+// ---------- CONTADOR REGRESSIVO (atualiza a cada minuto) ----------
+let intervalos = {};
+function iniciarContador(id) {
+  if (intervalos[id]) clearInterval(intervalos[id]);
+  intervalos[id] = setInterval(() => {
+    const esp = dados.especialidades.find(e => e.id === id);
+    if (!esp) return;
+    const hist = dados.historico[id];
+    if (!hist || !hist.proximaConsulta || !hist.proximaConsulta.data) {
+      clearInterval(intervalos[id]);
+      return;
+    }
+    // Atualiza apenas se a página atual for esta especialidade
+    const activePage = document.querySelector('.nav-item.active');
+    if (activePage && activePage.dataset.page === id) {
+      renderizarEspecialidade(id);
+    }
+  }, 60000); // a cada minuto
+}
+
+// ---------- EXAMES DE SANGUE ----------
+function renderizarExamesSangue() {
+  const exames = dados.examesSangue;
+  let html = `
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; margin-bottom:20px;">
+      <h2 style="font-weight:300;">🧪 Exames de Sangue</h2>
+      <button class="btn" onclick="abrirFormSangue()">+ Novo Exame</button>
+    </div>
+  `;
+
+  // Formulário para novo exame (oculto)
+  html += `
+    <div id="formSangue" style="display:none; background:white; padding:20px; border-radius:12px; margin-bottom:20px; box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+      <h3>Novo Exame de Sangue</h3>
+      <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr)); gap:12px; margin-top:12px;">
+        <div><label>Data</label><input type="date" id="sangueData" value="${new Date().toISOString().slice(0,10)}" /></div>
+        <div><label>Hemoglobina (g/dL)</label><input type="number" step="0.1" id="sangueHb" /></div>
+        <div><label>Glicose (mg/dL)</label><input type="number" step="0.1" id="sangueGlicose" /></div>
+        <div><label>Colesterol Total (mg/dL)</label><input type="number" step="0.1" id="sangueColesterol" /></div>
+        <div><label>Triglicerídeos (mg/dL)</label><input type="number" step="0.1" id="sangueTrig" /></div>
+        <div><label>HDL (mg/dL)</label><input type="number" step="0.1" id="sangueHDL" /></div>
+        <div><label>LDL (mg/dL)</label><input type="number" step="0.1" id="sangueLDL" /></div>
+        <div><label>Vitamina D (ng/mL)</label><input type="number" step="0.1" id="sangueVitD" /></div>
+      </div>
+      <button class="btn btn-success" onclick="salvarExameSangue()" style="margin-top:12px;">Salvar Exame</button>
+      <button class="btn btn-secondary" onclick="fecharFormSangue()" style="margin-top:12px;">Cancelar</button>
+    </div>
+  `;
+
+  // Lista de exames
+  if (exames.length === 0) {
+    html += `<div style="color:#95a5a6;">Nenhum exame de sangue registrado.</div>`;
+  } else {
+    html += `<div class="sangue-grid">`;
+    // Tabela com todos os exames
+    html += `<div class="section-block"><h3>📋 Histórico</h3><div style="max-height:400px; overflow-y:auto;">`;
+    exames.slice().reverse().forEach((ex, idx) => {
+      const d = new Date(ex.data);
+      const params = ex.parametros || {};
+      html += `
+        <div class="item-row">
+          <div class="item-info">
+            <span class="desc">${d.toLocaleDateString('pt-BR')}</span>
+            <span style="font-size:0.8rem; color:#7f8c8d;">
+              Hb: ${params.hemoglobina || '-'} | Glic: ${params.glicose || '-'} | Col: ${params.colesterol || '-'}
+            </span>
+          </div>
+          <div class="item-actions">
+            <button class="btn btn-sm btn-danger" onclick="removerExameSangue(${idx})">✕</button>
+          </div>
+        </div>
+      `;
+    });
+    html += `</div></div>`;
+
+    // Comparativo gráfico (últimos 5)
+    html += `<div class="section-block"><h3>📊 Comparativo (últimos 5)</h3><div class="comparativo-container">
+      <canvas id="graficoSangue" height="200"></canvas>
+    </div></div>`;
+    html += `</div>`;
+  }
+
+  contentArea.innerHTML = html;
+
+  // Se houver exames, desenhar gráfico
+  if (exames.length > 0) {
+    setTimeout(() => desenharGraficoSangue(exames), 100);
+  }
+}
+
+function abrirFormSangue() {
+  document.getElementById('formSangue').style.display = 'block';
+}
+
+function fecharFormSangue() {
+  document.getElementById('formSangue').style.display = 'none';
+}
+
+function salvarExameSangue() {
+  const data = document.getElementById('sangueData').value;
+  if (!data) return alert('Selecione a data.');
+  const parametros = {
+    hemoglobina: parseFloat(document.getElementById('sangueHb').value) || null,
+    glicose: parseFloat(document.getElementById('sangueGlicose').value) || null,
+    colesterol: parseFloat(document.getElementById('sangueColesterol').value) || null,
+    triglicerideos: parseFloat(document.getElementById('sangueTrig').value) || null,
+    hdl: parseFloat(document.getElementById('sangueHDL').value) || null,
+    ldl: parseFloat(document.getElementById('sangueLDL').value) || null,
+    vitaminaD: parseFloat(document.getElementById('sangueVitD').value) || null
+  };
+  dados.examesSangue.push({ data, parametros });
+  salvarDados(dados);
+  fecharFormSangue();
+  renderizarExamesSangue();
+}
+
+function removerExameSangue(index) {
+  // index é reverso
+  const realIndex = dados.examesSangue.length - 1 - index;
+  if (realIndex >= 0 && realIndex < dados.examesSangue.length) {
+    dados.examesSangue.splice(realIndex, 1);
+    salvarDados(dados);
+    renderizarExamesSangue();
+  }
+}
+
+function desenharGraficoSangue(exames) {
+  const ctx = document.getElementById('graficoSangue');
+  if (!ctx) return;
+  const ultimos = exames.slice(-5);
+  const labels = ultimos.map(e => new Date(e.data).toLocaleDateString('pt-BR'));
+
+  // Parâmetros comuns
+  const params = ['hemoglobina', 'glicose', 'colesterol', 'triglicerideos', 'hdl', 'ldl'];
+  const cores = ['#e74c3c', '#3498db', '#2ecc71', '#f1c40f', '#9b59b6', '#e67e22'];
+
+  const datasets = params.map((p, i) => {
+    const data = ultimos.map(e => e.parametros[p] || null);
+    // Só incluir se tiver pelo menos um valor não nulo
+    if (data.every(v => v === null)) return null;
+    return {
+      label: p.charAt(0).toUpperCase() + p.slice(1),
+      data: data,
+      borderColor: cores[i],
+      backgroundColor: cores[i] + '22',
+      tension: 0.2,
+      fill: false,
+      pointRadius: 4
+    };
+  }).filter(d => d !== null);
+
+  if (datasets.length === 0) {
+    ctx.parentElement.innerHTML = '<p style="color:#95a5a6;">Dados insuficientes para gráfico.</p>';
+    return;
+  }
+
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: datasets
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'top' }
+      },
+      scales: {
+        y: { beginAtZero: false }
+      }
+    }
+  });
+}
+
+// ---------- INICIALIZAÇÃO ----------
+function init() {
+  renderizarMenu();
+  navegarPara('dashboard');
+
+  // Toggle menu mobile
+  menuToggle.addEventListener('click', () => {
+    sidebar.classList.toggle('open');
+  });
+
+  // Fecha menu ao clicar fora
+  document.addEventListener('click', (e) => {
+    if (window.innerWidth <= 768) {
+      if (!sidebar.contains(e.target) && !menuToggle.contains(e.target)) {
+        sidebar.classList.remove('open');
+      }
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', init);
