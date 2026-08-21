@@ -1,103 +1,50 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#191919"><title>Mix Chicken • Gestão</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
-<link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Minha Saúde</title>
+  <link rel="stylesheet" href="styles.css" />
+  <!-- Chart.js para gráficos -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
-<div id="appShell">
-<aside class="sidebar">
-  <div class="brand"><div class="logo">MC</div><div><b>Mix Chicken</b><small>Gestão</small></div></div>
-  <nav id="sideNav"></nav>
-  <div class="side-foot"><button class="ghost" id="exportBtn">⇩ Backup</button><button class="ghost" id="importBtn">⇧ Restaurar</button><input id="fileInput" type="file" accept=".json" hidden></div>
-</aside>
+  <div class="app-container">
+    <!-- Menu Lateral -->
+    <aside class="sidebar" id="sidebar">
+      <div class="logo">
+        <h2>🩺 Minha Saúde</h2>
+      </div>
+      <nav class="nav">
+        <ul>
+          <li class="nav-item active" data-page="dashboard">
+            <span class="icon">📊</span> Dashboard
+          </li>
+          <li class="nav-item" data-page="exames-sangue">
+            <span class="icon">🧪</span> Exames de Sangue
+          </li>
+          <li class="nav-divider">Especialidades</li>
+          <!-- As especialidades serão inseridas via JS -->
+          <div id="especialidades-list"></div>
+        </ul>
+      </nav>
+    </aside>
 
-<main>
-<header class="topbar">
-  <div><span class="kicker">GESTÃO OPERACIONAL</span><h1 id="title">Dashboard</h1></div>
-  <div class="top-actions"><select id="period"><option value="30">30 dias</option><option value="90">90 dias</option><option value="365">12 meses</option></select><button class="primary" id="quickSale">+ Venda</button></div>
-</header>
-
-<section id="dashboard" class="view">
-  <div class="cards five">
-    <article class="metric"><span>Faturamento</span><strong id="mRevenue">R$ 0</strong><em id="mRevenueSub">período</em></article>
-    <article class="metric"><span>CMV</span><strong id="mCMV">0%</strong><em id="mCMVSub">R$ 0</em></article>
-    <article class="metric"><span>CMO</span><strong id="mCMO">0%</strong><em id="mCMOSub">R$ 0</em></article>
-    <article class="metric"><span>Margem contribuição</span><strong id="mMargin">0%</strong><em id="mMarginSub">R$ 0</em></article>
-    <article class="metric"><span>Ticket médio</span><strong id="mTicket">R$ 0</strong><em id="mOrders">0 vendas</em></article>
+    <!-- Conteúdo Principal -->
+    <main class="main-content">
+      <header class="top-header">
+        <button class="menu-toggle" id="menuToggle">☰</button>
+        <h1 id="pageTitle">Dashboard</h1>
+        <div class="header-actions">
+          <span class="date-display" id="currentDate"></span>
+        </div>
+      </header>
+      <section class="content" id="contentArea">
+        <!-- O conteúdo será renderizado dinamicamente -->
+      </section>
+    </main>
   </div>
-  <div class="grid two">
-    <article class="panel chart tall"><div class="panel-title"><div><h2>Faturamento × custos</h2><p>Evolução do período</p></div></div><canvas id="salesChart"></canvas></article>
-    <article class="panel chart"><div class="panel-title"><div><h2>Estrutura de custos</h2><p>Participação no faturamento</p></div></div><canvas id="costChart"></canvas></article>
-  </div>
-  <div class="grid two">
-    <article class="panel chart"><div class="panel-title"><div><h2>Mais vendidos</h2><p>Quantidade de unidades</p></div></div><canvas id="topChart"></canvas></article>
-    <article class="panel"><div class="panel-title"><div><h2>Estoque crítico</h2><p>Itens que precisam de reposição</p></div><button class="link" data-go="estoque">Ver tudo</button></div><div id="alerts" class="alerts"></div></article>
-  </div>
-</section>
 
-<section id="vendas" class="view">
- <div class="section-head"><div><h2>Vendas</h2><p>Registre vendas e acompanhe produtos e ticket.</p></div><button class="primary" id="newSale">+ Registrar venda</button></div>
- <div class="cards three"><article class="metric"><span>Hoje</span><strong id="todayRevenue">R$ 0</strong></article><article class="metric"><span>Vendas hoje</span><strong id="todayOrders">0</strong></article><article class="metric"><span>Ticket hoje</span><strong id="todayTicket">R$ 0</strong></article></div>
- <div class="panel table-panel"><div class="panel-title"><h2>Histórico</h2><input class="search" id="saleSearch" placeholder="Buscar produto..."></div><div class="table-wrap"><table><thead><tr><th>Data</th><th>Produto</th><th>Qtd.</th><th>Preço</th><th>Total</th><th>CMV</th><th></th></tr></thead><tbody id="salesTable"></tbody></table></div></div>
-</section>
-
-<section id="financeiro" class="view">
- <div class="section-head"><div><h2>Financeiro</h2><p>Fluxo de caixa e resultado.</p></div><button class="primary" id="newTx">+ Lançamento</button></div>
- <div class="cards three"><article class="metric"><span>Entradas</span><strong id="finIn">R$ 0</strong></article><article class="metric"><span>Saídas</span><strong id="finOut">R$ 0</strong></article><article class="metric"><span>Resultado</span><strong id="finNet">R$ 0</strong></article></div>
- <div class="panel table-panel"><div class="panel-title"><h2>Lançamentos</h2><input class="search" id="txSearch" placeholder="Buscar..."></div><div class="table-wrap"><table><thead><tr><th>Data</th><th>Tipo</th><th>Categoria</th><th>Descrição</th><th>Valor</th><th></th></tr></thead><tbody id="txTable"></tbody></table></div></div>
-</section>
-
-<section id="compras" class="view">
- <div class="section-head"><div><h2>Compras</h2><p>Entradas de insumos e custo médio.</p></div><button class="primary" id="newPurchase">+ Nova compra</button></div>
- <div class="panel table-panel"><div class="panel-title"><h2>Compras recentes</h2></div><div class="table-wrap"><table><thead><tr><th>Data</th><th>Insumo</th><th>Qtd.</th><th>Preço un.</th><th>Total</th><th>Fornecedor</th><th></th></tr></thead><tbody id="purchaseTable"></tbody></table></div></div>
-</section>
-
-<section id="insumos" class="view">
- <div class="section-head"><div><h2>Insumos</h2><p>Ingredientes, fornecedores e preços.</p></div><button class="primary" id="newIngredient">+ Novo insumo</button></div>
- <div class="panel table-panel"><div class="panel-title"><h2>Cadastro</h2><input class="search" id="ingredientSearch" placeholder="Buscar..."></div><div class="table-wrap"><table><thead><tr><th>Insumo</th><th>Un.</th><th>Preço</th><th>Fornecedor</th><th>Estoque</th><th>Mín.</th><th></th></tr></thead><tbody id="ingredientTable"></tbody></table></div></div>
-</section>
-
-<section id="estoque" class="view">
- <div class="section-head"><div><h2>Estoque</h2><p>Posição, movimentações e perdas.</p></div><button class="primary" id="newMovement">+ Movimentar</button></div>
- <div class="cards three"><article class="metric"><span>Valor em estoque</span><strong id="stockValue">R$ 0</strong></article><article class="metric"><span>Itens</span><strong id="stockCount">0</strong></article><article class="metric"><span>Críticos</span><strong id="stockCritical">0</strong></article></div>
- <div class="panel table-panel"><div class="panel-title"><h2>Posição atual</h2><input class="search" id="stockSearch" placeholder="Buscar..."></div><div class="table-wrap"><table><thead><tr><th>Insumo</th><th>Qtd.</th><th>Un.</th><th>Preço</th><th>Valor</th><th>Status</th><th></th></tr></thead><tbody id="stockTable"></tbody></table></div></div>
-</section>
-
-<section id="fichas" class="view">
- <div class="section-head"><div><h2>Fichas técnicas</h2><p>Custo, CMV, markup e margem por produto.</p></div><button class="primary" id="newProduct">+ Novo produto</button></div>
- <div id="recipeGrid" class="recipe-grid"></div>
-</section>
-
-<section id="produtos" class="view">
- <div class="section-head"><div><h2>Produtos</h2><p>Preço e rentabilidade.</p></div><button class="primary" id="newProduct2">+ Novo produto</button></div>
- <div class="panel table-panel"><div class="panel-title"><h2>Catálogo</h2></div><div class="table-wrap"><table><thead><tr><th>Produto</th><th>Preço</th><th>Custo</th><th>CMV</th><th>Markup</th><th>Margem</th><th>Vendidos</th><th></th></tr></thead><tbody id="productTable"></tbody></table></div></div>
-</section>
-
-<section id="relatorios" class="view">
- <div class="section-head"><div><h2>Relatórios</h2><p>Indicadores para tomada de decisão.</p></div><button class="secondary" id="printReport">Imprimir relatório</button></div>
- <div class="report-grid">
-   <article class="panel"><h2>Rentabilidade por produto</h2><div class="table-wrap"><table><thead><tr><th>Produto</th><th>Preço</th><th>Custo</th><th>Margem</th><th>CMV</th></tr></thead><tbody id="profitTable"></tbody></table></div></article>
-   <article class="panel"><h2>Indicadores</h2><div id="indicators" class="indicator-list"></div></article>
- </div>
-</section>
-
-<section id="config" class="view">
- <div class="section-head"><div><h2>Configurações</h2><p>Parâmetros e dados do negócio.</p></div></div>
- <div class="config-grid">
-  <article class="panel form"><h2>Custos fixos gerenciais</h2><label>Mão de obra mensal<input id="cfgLabor" type="number" step=".01"></label><label>Faturamento alvo mensal<input id="cfgTarget" type="number" step=".01"></label><label>Despesas fixas mensais<input id="cfgFixed" type="number" step=".01"></label><button class="primary" id="saveCfg">Salvar</button></article>
-  <article class="panel"><h2>Dados</h2><p class="muted">Faça backup antes de trocar de computador ou limpar os dados do navegador.</p><div class="button-stack"><button class="secondary" id="export2">Exportar backup</button><button class="danger" id="reset">Restaurar demonstração</button></div></article>
- </div>
-</section>
-</main>
-</div>
-
-<nav class="bottom-nav" id="bottomNav"></nav>
-<div id="modal" class="modal hidden"><div class="modal-box"><div class="modal-head"><h2 id="modalTitle"></h2><button id="close">×</button></div><form id="form"></form></div></div>
-<div id="toast"></div>
-<script src="app.js"></script>
-</body></html>
+  <script src="app.js"></script>
+</body>
+</html>
