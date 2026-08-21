@@ -1,8 +1,8 @@
 // ============================================================
-//  app.js – Lógica completa do "Minha Saúde"
+//  app.js – Sistema Minha Saúde
 // ============================================================
 
-// ---------- DADOS INICIAIS (se não houver no localStorage) ----------
+// ---------- DADOS PADRÃO ----------
 const DADOS_PADRAO = {
   especialidades: [
     { id: 'cardiologia', nome: 'Cardiologia', icone: '❤️' },
@@ -14,69 +14,85 @@ const DADOS_PADRAO = {
     { id: 'ginecologia', nome: 'Ginecologia', icone: '👩‍⚕️' },
     { id: 'urologia', nome: 'Urologia', icone: '🔬' }
   ],
-  // Dados por especialidade
-  historico: {
-    cardiologia: { consultas: [], exames: [], proximaConsulta: null, recomendacoes: { melhorar: '', fazer: '', medicamentos: '' } },
-    gastro: { consultas: [], exames: [], proximaConsulta: null, recomendacoes: { melhorar: '', fazer: '', medicamentos: '' } },
-    oftalmo: { consultas: [], exames: [], proximaConsulta: null, recomendacoes: { melhorar: '', fazer: '', medicamentos: '' } },
-    ortopedia: { consultas: [], exames: [], proximaConsulta: null, recomendacoes: { melhorar: '', fazer: '', medicamentos: '' } },
-    dermatologia: { consultas: [], exames: [], proximaConsulta: null, recomendacoes: { melhorar: '', fazer: '', medicamentos: '' } },
-    neurologia: { consultas: [], exames: [], proximaConsulta: null, recomendacoes: { melhorar: '', fazer: '', medicamentos: '' } },
-    ginecologia: { consultas: [], exames: [], proximaConsulta: null, recomendacoes: { melhorar: '', fazer: '', medicamentos: '' } },
-    urologia: { consultas: [], exames: [], proximaConsulta: null, recomendacoes: { melhorar: '', fazer: '', medicamentos: '' } }
-  },
-  examesSangue: [] // array de { data, parametros: { hemoglobina, glicose, colesterol, ... } }
+  historico: {},
+  examesSangue: []
 };
 
+// Inicializa histórico para cada especialidade
+DADOS_PADRAO.especialidades.forEach(esp => {
+  DADOS_PADRAO.historico[esp.id] = {
+    consultas: [],
+    exames: [],
+    proximaConsulta: null,
+    recomendacoes: { melhorar: '', fazer: '', medicamentos: '' }
+  };
+});
+
 // ---------- GERENCIAMENTO DE DADOS ----------
+let dados = {};
+
 function carregarDados() {
-  const dados = localStorage.getItem('minhaSaude');
-  if (dados) {
+  const stored = localStorage.getItem('minhaSaude');
+  if (stored) {
     try {
-      return JSON.parse(dados);
+      dados = JSON.parse(stored);
+      // Garante que todas as especialidades existam
+      DADOS_PADRAO.especialidades.forEach(esp => {
+        if (!dados.historico[esp.id]) {
+          dados.historico[esp.id] = {
+            consultas: [],
+            exames: [],
+            proximaConsulta: null,
+            recomendacoes: { melhorar: '', fazer: '', medicamentos: '' }
+          };
+        }
+      });
+      return;
     } catch (e) {
       console.warn('Erro ao parsear dados, usando padrão');
-      return JSON.parse(JSON.stringify(DADOS_PADRAO));
     }
   }
-  return JSON.parse(JSON.stringify(DADOS_PADRAO));
+  dados = JSON.parse(JSON.stringify(DADOS_PADRAO));
 }
 
-function salvarDados(dados) {
+function salvarDados() {
   localStorage.setItem('minhaSaude', JSON.stringify(dados));
 }
 
-let dados = carregarDados();
+carregarDados();
 
 // ---------- REFERÊNCIAS DOM ----------
 const contentArea = document.getElementById('contentArea');
 const pageTitle = document.getElementById('pageTitle');
-const especialidadesList = document.getElementById('especialidades-list');
-const sidebar = document.getElementById('sidebar');
+const especialidadesMenu = document.getElementById('especialidades-menu');
+const sidebar = document.querySelector('.sidebar');
 const menuToggle = document.getElementById('menuToggle');
+const refreshBtn = document.getElementById('refreshBtn');
 
-// ---------- RENDERIZAÇÃO DO MENU LATERAL ----------
+// ---------- RENDERIZAR MENU LATERAL ----------
 function renderizarMenu() {
-  // Limpa a lista de especialidades (mantém o título "Especialidades")
-  const div = document.getElementById('especialidades-list');
-  div.innerHTML = '';
+  // Especialidades
+  especialidadesMenu.innerHTML = '';
   dados.especialidades.forEach(esp => {
     const li = document.createElement('li');
     li.className = 'nav-item';
-    li.dataset.page = esp.id;
-    li.innerHTML = `<span class="icon">${esp.icone}</span> ${esp.nome}`;
+    li.dataset.view = esp.id;
+    li.innerHTML = `
+      <span class="nav-icon">${esp.icone}</span>
+      <span class="nav-label">${esp.nome}</span>
+    `;
     li.addEventListener('click', () => {
       navegarPara(esp.id);
       fecharMenuMobile();
     });
-    div.appendChild(li);
+    especialidadesMenu.appendChild(li);
   });
 
-  // Eventos para os itens fixos
-  document.querySelectorAll('.nav-item[data-page]').forEach(el => {
+  // Eventos dos itens fixos
+  document.querySelectorAll('.nav-item[data-view]').forEach(el => {
     el.addEventListener('click', (e) => {
-      const page = el.dataset.page;
-      navegarPara(page);
+      const view = el.dataset.view;
+      navegarPara(view);
       fecharMenuMobile();
     });
   });
@@ -89,25 +105,33 @@ function fecharMenuMobile() {
 }
 
 // ---------- NAVEGAÇÃO ----------
-function navegarPara(pagina) {
-  // Atualiza active no menu
+function navegarPara(view) {
+  // Atualiza active
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-  const target = document.querySelector(`.nav-item[data-page="${pagina}"]`);
+  const target = document.querySelector(`.nav-item[data-view="${view}"]`);
   if (target) target.classList.add('active');
 
-  if (pagina === 'dashboard') {
-    renderizarDashboard();
-    pageTitle.textContent = 'Dashboard';
-  } else if (pagina === 'exames-sangue') {
-    renderizarExamesSangue();
-    pageTitle.textContent = '🧪 Exames de Sangue';
-  } else {
-    // especialidade
-    const esp = dados.especialidades.find(e => e.id === pagina);
-    if (esp) {
-      renderizarEspecialidade(esp.id);
-      pageTitle.textContent = `${esp.icone} ${esp.nome}`;
-    }
+  switch (view) {
+    case 'dashboard':
+      renderizarDashboard();
+      pageTitle.textContent = '📊 Dashboard';
+      break;
+    case 'exames-sangue':
+      renderizarExamesSangue();
+      pageTitle.textContent = '🧪 Exames de Sangue';
+      break;
+    case 'configuracoes':
+      renderizarConfiguracoes();
+      pageTitle.textContent = '⚙️ Configurações';
+      break;
+    default:
+      // Especialidade
+      const esp = dados.especialidades.find(e => e.id === view);
+      if (esp) {
+        renderizarEspecialidade(esp.id);
+        pageTitle.textContent = `${esp.icone} ${esp.nome}`;
+      }
+      break;
   }
 }
 
@@ -116,11 +140,16 @@ function renderizarDashboard() {
   const hoje = new Date();
   const hojeStr = hoje.toISOString().slice(0,10);
 
-  let html = `<h2 style="font-weight:300; margin-bottom:8px;">📋 Visão Geral</h2>
-              <div class="dashboard-grid">`;
+  let html = `
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; margin-bottom:12px;">
+      <h2 style="font-weight:300; color:#1e2a3a;">Visão Geral da Saúde</h2>
+      <span style="color:#7f8c8d; font-size:0.9rem;">Última atualização: ${hoje.toLocaleString('pt-BR')}</span>
+    </div>
+    <div class="dashboard-grid">
+  `;
 
   dados.especialidades.forEach(esp => {
-    const hist = dados.historico[esp.id] || { consultas: [], exames: [], proximaConsulta: null };
+    const hist = dados.historico[esp.id];
     const ultimaConsulta = hist.consultas.length > 0 ? hist.consultas[hist.consultas.length - 1] : null;
     const prox = hist.proximaConsulta;
 
@@ -131,17 +160,19 @@ function renderizarDashboard() {
     }
 
     let diasFaltam = '--';
+    let classeDestaque = '';
     if (prox && prox.data) {
       const proxDate = new Date(prox.data);
       const diff = Math.ceil((proxDate - hoje) / (1000 * 60 * 60 * 24));
       diasFaltam = diff >= 0 ? diff : 'Atrasado';
+      if (typeof diasFaltam === 'number' && diasFaltam <= 7) classeDestaque = 'highlight';
     }
 
     html += `
       <div class="card" onclick="navegarPara('${esp.id}')" style="cursor:pointer;">
         <h3>${esp.icone} ${esp.nome}</h3>
         <div class="info-line"><span class="label">Última visita</span><span class="value">${ultimaStr}</span></div>
-        <div class="info-line"><span class="label">Próxima consulta</span><span class="value ${typeof diasFaltam === 'number' && diasFaltam <= 7 ? 'highlight' : ''}">${diasFaltam === '--' ? 'Não agendada' : diasFaltam + ' dias'}</span></div>
+        <div class="info-line"><span class="label">Próxima consulta</span><span class="value ${classeDestaque}">${diasFaltam === '--' ? 'Não agendada' : diasFaltam + ' dias'}</span></div>
         <div style="margin-top:8px; font-size:0.9rem; color:#7f8c8d;">${hist.exames.length} exames registrados</div>
       </div>
     `;
@@ -149,10 +180,10 @@ function renderizarDashboard() {
 
   html += `</div>`;
 
-  // Adiciona um card de resumo de exames de sangue
+  // Card resumo exames sangue
   const ultimoSangue = dados.examesSangue.length > 0 ? dados.examesSangue[dados.examesSangue.length - 1] : null;
   html += `
-    <div class="card" style="margin-top:20px;" onclick="navegarPara('exames-sangue')" style="cursor:pointer;">
+    <div class="card" style="margin-top:24px; cursor:pointer;" onclick="navegarPara('exames-sangue')">
       <h3>🧪 Exames de Sangue</h3>
       <div class="info-line"><span class="label">Último exame</span><span class="value">${ultimoSangue ? new Date(ultimoSangue.data).toLocaleDateString('pt-BR') : 'Nenhum'}</span></div>
       <div class="info-line"><span class="label">Total de exames</span><span class="value">${dados.examesSangue.length}</span></div>
@@ -167,7 +198,7 @@ function renderizarDashboard() {
 function renderizarEspecialidade(id) {
   const esp = dados.especialidades.find(e => e.id === id);
   if (!esp) return;
-  const hist = dados.historico[id] || { consultas: [], exames: [], proximaConsulta: null, recomendacoes: { melhorar: '', fazer: '', medicamentos: '' } };
+  const hist = dados.historico[id];
 
   // Contador regressivo
   let countdownHtml = '';
@@ -175,19 +206,20 @@ function renderizarEspecialidade(id) {
     const proxDate = new Date(hist.proximaConsulta.data);
     const hoje = new Date();
     const diff = Math.ceil((proxDate - hoje) / (1000 * 60 * 60 * 24));
-    countdownHtml = `<div class="countdown">${diff >= 0 ? diff + ' dias' : 'Atrasado!'}</div>`;
+    const texto = diff >= 0 ? `${diff} dias` : 'Atrasado!';
+    countdownHtml = `<div class="countdown-box"><span class="label">Próxima consulta:</span> ${texto}</div>`;
   } else {
-    countdownHtml = `<div class="countdown" style="background:#ecf0f1; color:#7f8c8d;">Não agendada</div>`;
+    countdownHtml = `<div class="countdown-box" style="background:#ecf0f1; color:#7f8c8d;"><span class="label">Próxima consulta:</span> Não agendada</div>`;
   }
 
   let html = `
     <div class="especialidade-header">
       <h2>${esp.icone} ${esp.nome}</h2>
-      <div>${countdownHtml}</div>
+      ${countdownHtml}
     </div>
   `;
 
-  // ---- Consultas ----
+  // ---- CONSULTAS ----
   html += `<div class="section-block">
     <h3>📅 Consultas <span class="badge">${hist.consultas.length}</span></h3>
     <div class="item-list">`;
@@ -218,7 +250,7 @@ function renderizarEspecialidade(id) {
     </div>
   </div>`;
 
-  // ---- Exames (com upload) ----
+  // ---- EXAMES COM UPLOAD ----
   html += `<div class="section-block">
     <h3>📄 Exames Realizados <span class="badge">${hist.exames.length}</span></h3>
     <div class="item-list">`;
@@ -244,7 +276,7 @@ function renderizarEspecialidade(id) {
   }
   html += `</div>
     <div class="upload-area" id="uploadArea_${id}">
-      <span class="upload-label">📎 Clique ou arraste para anexar exame (PDF, PNG, JPEG)</span>
+      <span class="upload-label">📎 <strong>Clique ou arraste</strong> para anexar exame (PDF, PNG, JPEG)</span>
       <input type="file" id="fileInput_${id}" accept=".pdf,.png,.jpg,.jpeg" multiple />
     </div>
     <div class="inline-form">
@@ -254,7 +286,7 @@ function renderizarEspecialidade(id) {
     </div>
   </div>`;
 
-  // ---- Agendamento próxima consulta ----
+  // ---- AGENDAMENTO PRÓXIMA CONSULTA ----
   const prox = hist.proximaConsulta || { data: '', descricao: '' };
   html += `<div class="section-block">
     <h3>📆 Agendamento da Próxima Consulta</h3>
@@ -266,7 +298,7 @@ function renderizarEspecialidade(id) {
     </div>
   </div>`;
 
-  // ---- Recomendações ----
+  // ---- RECOMENDAÇÕES ----
   const rec = hist.recomendacoes || { melhorar: '', fazer: '', medicamentos: '' };
   html += `<div class="section-block">
     <h3>💡 Recomendações de Saúde</h3>
@@ -286,36 +318,10 @@ function renderizarEspecialidade(id) {
 
   contentArea.innerHTML = html;
 
-  // Configurar upload de arquivos
-  const fileInput = document.getElementById(`fileInput_${id}`);
-  const uploadArea = document.getElementById(`uploadArea_${id}`);
-  if (fileInput && uploadArea) {
-    fileInput.addEventListener('change', (e) => {
-      const files = e.target.files;
-      for (let f of files) {
-        processarArquivo(id, f);
-      }
-      fileInput.value = '';
-    });
-    uploadArea.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      uploadArea.style.borderColor = '#2ecc71';
-    });
-    uploadArea.addEventListener('dragleave', () => {
-      uploadArea.style.borderColor = '#bdc3c7';
-    });
-    uploadArea.addEventListener('drop', (e) => {
-      e.preventDefault();
-      uploadArea.style.borderColor = '#bdc3c7';
-      const files = e.dataTransfer.files;
-      for (let f of files) {
-        processarArquivo(id, f);
-      }
-    });
-    uploadArea.addEventListener('click', () => fileInput.click());
-  }
+  // Configurar upload
+  configurarUpload(id);
 
-  // Atualizar contador regressivo periodicamente
+  // Atualizar contador a cada minuto
   if (hist.proximaConsulta && hist.proximaConsulta.data) {
     iniciarContador(id);
   }
@@ -327,21 +333,48 @@ function adicionarConsulta(id) {
   const medico = document.getElementById('consultaMedico').value.trim() || 'Médico';
   const obs = document.getElementById('consultaObs').value.trim();
   if (!data) return alert('Selecione uma data.');
-  const hist = dados.historico[id];
-  hist.consultas.push({ data, medico, observacoes: obs });
-  salvarDados(dados);
+  dados.historico[id].consultas.push({ data, medico, observacoes: obs });
+  salvarDados();
   renderizarEspecialidade(id);
 }
 
 function removerConsulta(id, index) {
   const hist = dados.historico[id];
-  // index é relativo ao array invertido, precisamos do índice real
   const realIndex = hist.consultas.length - 1 - index;
   if (realIndex >= 0 && realIndex < hist.consultas.length) {
     hist.consultas.splice(realIndex, 1);
-    salvarDados(dados);
+    salvarDados();
     renderizarEspecialidade(id);
   }
+}
+
+function configurarUpload(id) {
+  const fileInput = document.getElementById(`fileInput_${id}`);
+  const uploadArea = document.getElementById(`uploadArea_${id}`);
+  if (!fileInput || !uploadArea) return;
+
+  fileInput.addEventListener('change', (e) => {
+    for (let f of e.target.files) {
+      processarArquivo(id, f);
+    }
+    fileInput.value = '';
+  });
+
+  uploadArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadArea.style.borderColor = '#2ecc71';
+  });
+  uploadArea.addEventListener('dragleave', () => {
+    uploadArea.style.borderColor = '#bdc3c7';
+  });
+  uploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadArea.style.borderColor = '#bdc3c7';
+    for (let f of e.dataTransfer.files) {
+      processarArquivo(id, f);
+    }
+  });
+  uploadArea.addEventListener('click', () => fileInput.click());
 }
 
 function processarArquivo(id, file) {
@@ -350,14 +383,8 @@ function processarArquivo(id, file) {
     const base64 = e.target.result;
     const nome = file.name;
     const data = new Date().toISOString().slice(0,10);
-    const hist = dados.historico[id];
-    hist.exames.push({
-      data,
-      nome: nome,
-      arquivo: base64,
-      tipo: file.type
-    });
-    salvarDados(dados);
+    dados.historico[id].exames.push({ data, nome, arquivo: base64, tipo: file.type });
+    salvarDados();
     renderizarEspecialidade(id);
   };
   reader.readAsDataURL(file);
@@ -367,9 +394,8 @@ function adicionarExame(id) {
   const data = document.getElementById(`exameData_${id}`).value;
   const nome = document.getElementById(`exameNome_${id}`).value.trim() || 'Exame';
   if (!data) return alert('Selecione uma data.');
-  const hist = dados.historico[id];
-  hist.exames.push({ data, nome, arquivo: null });
-  salvarDados(dados);
+  dados.historico[id].exames.push({ data, nome, arquivo: null });
+  salvarDados();
   renderizarEspecialidade(id);
 }
 
@@ -378,7 +404,7 @@ function removerExame(id, index) {
   const realIndex = hist.exames.length - 1 - index;
   if (realIndex >= 0 && realIndex < hist.exames.length) {
     hist.exames.splice(realIndex, 1);
-    salvarDados(dados);
+    salvarDados();
     renderizarEspecialidade(id);
   }
 }
@@ -401,16 +427,14 @@ function salvarProximaConsulta(id) {
   const data = document.getElementById(`proxData_${id}`).value;
   const desc = document.getElementById(`proxDesc_${id}`).value.trim();
   if (!data) return alert('Selecione uma data.');
-  const hist = dados.historico[id];
-  hist.proximaConsulta = { data, descricao: desc };
-  salvarDados(dados);
+  dados.historico[id].proximaConsulta = { data, descricao: desc };
+  salvarDados();
   renderizarEspecialidade(id);
 }
 
 function removerProximaConsulta(id) {
-  const hist = dados.historico[id];
-  hist.proximaConsulta = null;
-  salvarDados(dados);
+  dados.historico[id].proximaConsulta = null;
+  salvarDados();
   renderizarEspecialidade(id);
 }
 
@@ -418,9 +442,8 @@ function salvarRecomendacoes(id) {
   const melhorar = document.getElementById(`recMelhorar_${id}`).value;
   const fazer = document.getElementById(`recFazer_${id}`).value;
   const medicamentos = document.getElementById(`recMedicamentos_${id}`).value;
-  const hist = dados.historico[id];
-  hist.recomendacoes = { melhorar, fazer, medicamentos };
-  salvarDados(dados);
+  dados.historico[id].recomendacoes = { melhorar, fazer, medicamentos };
+  salvarDados();
   alert('Recomendações salvas!');
 }
 
@@ -429,19 +452,13 @@ let intervalos = {};
 function iniciarContador(id) {
   if (intervalos[id]) clearInterval(intervalos[id]);
   intervalos[id] = setInterval(() => {
-    const esp = dados.especialidades.find(e => e.id === id);
-    if (!esp) return;
-    const hist = dados.historico[id];
-    if (!hist || !hist.proximaConsulta || !hist.proximaConsulta.data) {
-      clearInterval(intervalos[id]);
-      return;
-    }
-    // Atualiza apenas se a página atual for esta especialidade
     const activePage = document.querySelector('.nav-item.active');
-    if (activePage && activePage.dataset.page === id) {
+    if (activePage && activePage.dataset.view === id) {
       renderizarEspecialidade(id);
+    } else {
+      clearInterval(intervalos[id]);
     }
-  }, 60000); // a cada minuto
+  }, 60000);
 }
 
 // ---------- EXAMES DE SANGUE ----------
@@ -450,15 +467,15 @@ function renderizarExamesSangue() {
   let html = `
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; margin-bottom:20px;">
       <h2 style="font-weight:300;">🧪 Exames de Sangue</h2>
-      <button class="btn" onclick="abrirFormSangue()">+ Novo Exame</button>
+      <button class="btn btn-primary" onclick="toggleFormSangue()">+ Novo Exame</button>
     </div>
   `;
 
-  // Formulário para novo exame (oculto)
+  // Formulário (oculto inicialmente)
   html += `
-    <div id="formSangue" style="display:none; background:white; padding:20px; border-radius:12px; margin-bottom:20px; box-shadow:0 2px 8px rgba(0,0,0,0.04);">
-      <h3>Novo Exame de Sangue</h3>
-      <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr)); gap:12px; margin-top:12px;">
+    <div id="formSangueContainer" style="display:none; background:white; padding:20px; border-radius:12px; margin-bottom:20px; box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+      <h3 style="font-weight:400; margin-bottom:12px;">Novo Exame de Sangue</h3>
+      <div class="form-sangue">
         <div><label>Data</label><input type="date" id="sangueData" value="${new Date().toISOString().slice(0,10)}" /></div>
         <div><label>Hemoglobina (g/dL)</label><input type="number" step="0.1" id="sangueHb" /></div>
         <div><label>Glicose (mg/dL)</label><input type="number" step="0.1" id="sangueGlicose" /></div>
@@ -468,17 +485,19 @@ function renderizarExamesSangue() {
         <div><label>LDL (mg/dL)</label><input type="number" step="0.1" id="sangueLDL" /></div>
         <div><label>Vitamina D (ng/mL)</label><input type="number" step="0.1" id="sangueVitD" /></div>
       </div>
-      <button class="btn btn-success" onclick="salvarExameSangue()" style="margin-top:12px;">Salvar Exame</button>
-      <button class="btn btn-secondary" onclick="fecharFormSangue()" style="margin-top:12px;">Cancelar</button>
+      <div style="margin-top:16px; display:flex; gap:12px;">
+        <button class="btn btn-success" onclick="salvarExameSangue()">Salvar</button>
+        <button class="btn btn-secondary" onclick="toggleFormSangue()">Cancelar</button>
+      </div>
     </div>
   `;
 
-  // Lista de exames
+  // Lista e gráfico
   if (exames.length === 0) {
     html += `<div style="color:#95a5a6;">Nenhum exame de sangue registrado.</div>`;
   } else {
     html += `<div class="sangue-grid">`;
-    // Tabela com todos os exames
+    // Tabela histórica
     html += `<div class="section-block"><h3>📋 Histórico</h3><div style="max-height:400px; overflow-y:auto;">`;
     exames.slice().reverse().forEach((ex, idx) => {
       const d = new Date(ex.data);
@@ -488,7 +507,7 @@ function renderizarExamesSangue() {
           <div class="item-info">
             <span class="desc">${d.toLocaleDateString('pt-BR')}</span>
             <span style="font-size:0.8rem; color:#7f8c8d;">
-              Hb: ${params.hemoglobina || '-'} | Glic: ${params.glicose || '-'} | Col: ${params.colesterol || '-'}
+              Hb: ${params.hemoglobina ?? '-'} | Glic: ${params.glicose ?? '-'} | Col: ${params.colesterol ?? '-'}
             </span>
           </div>
           <div class="item-actions">
@@ -499,7 +518,7 @@ function renderizarExamesSangue() {
     });
     html += `</div></div>`;
 
-    // Comparativo gráfico (últimos 5)
+    // Gráfico comparativo
     html += `<div class="section-block"><h3>📊 Comparativo (últimos 5)</h3><div class="comparativo-container">
       <canvas id="graficoSangue" height="200"></canvas>
     </div></div>`;
@@ -508,18 +527,16 @@ function renderizarExamesSangue() {
 
   contentArea.innerHTML = html;
 
-  // Se houver exames, desenhar gráfico
   if (exames.length > 0) {
     setTimeout(() => desenharGraficoSangue(exames), 100);
   }
 }
 
-function abrirFormSangue() {
-  document.getElementById('formSangue').style.display = 'block';
-}
-
-function fecharFormSangue() {
-  document.getElementById('formSangue').style.display = 'none';
+function toggleFormSangue() {
+  const container = document.getElementById('formSangueContainer');
+  if (container) {
+    container.style.display = container.style.display === 'none' ? 'block' : 'none';
+  }
 }
 
 function salvarExameSangue() {
@@ -535,17 +552,16 @@ function salvarExameSangue() {
     vitaminaD: parseFloat(document.getElementById('sangueVitD').value) || null
   };
   dados.examesSangue.push({ data, parametros });
-  salvarDados(dados);
-  fecharFormSangue();
+  salvarDados();
+  toggleFormSangue();
   renderizarExamesSangue();
 }
 
 function removerExameSangue(index) {
-  // index é reverso
   const realIndex = dados.examesSangue.length - 1 - index;
   if (realIndex >= 0 && realIndex < dados.examesSangue.length) {
     dados.examesSangue.splice(realIndex, 1);
-    salvarDados(dados);
+    salvarDados();
     renderizarExamesSangue();
   }
 }
@@ -556,13 +572,11 @@ function desenharGraficoSangue(exames) {
   const ultimos = exames.slice(-5);
   const labels = ultimos.map(e => new Date(e.data).toLocaleDateString('pt-BR'));
 
-  // Parâmetros comuns
   const params = ['hemoglobina', 'glicose', 'colesterol', 'triglicerideos', 'hdl', 'ldl'];
   const cores = ['#e74c3c', '#3498db', '#2ecc71', '#f1c40f', '#9b59b6', '#e67e22'];
 
   const datasets = params.map((p, i) => {
-    const data = ultimos.map(e => e.parametros[p] || null);
-    // Só incluir se tiver pelo menos um valor não nulo
+    const data = ultimos.map(e => e.parametros[p] ?? null);
     if (data.every(v => v === null)) return null;
     return {
       label: p.charAt(0).toUpperCase() + p.slice(1),
@@ -582,20 +596,79 @@ function desenharGraficoSangue(exames) {
 
   new Chart(ctx, {
     type: 'line',
-    data: {
-      labels: labels,
-      datasets: datasets
-    },
+    data: { labels, datasets },
     options: {
       responsive: true,
-      plugins: {
-        legend: { position: 'top' }
-      },
-      scales: {
-        y: { beginAtZero: false }
-      }
+      plugins: { legend: { position: 'top' } },
+      scales: { y: { beginAtZero: false } }
     }
   });
+}
+
+// ---------- CONFIGURAÇÕES ----------
+function renderizarConfiguracoes() {
+  const html = `
+    <h2 style="font-weight:300;">⚙️ Configurações</h2>
+    <div class="section-block" style="margin-top:16px;">
+      <h3>Gerenciar Dados</h3>
+      <p style="margin-bottom:16px;">Exportar ou importar todos os dados (backup).</p>
+      <div style="display:flex; gap:12px; flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="exportarDados()">📤 Exportar JSON</button>
+        <button class="btn btn-secondary" onclick="importarDados()">📥 Importar JSON</button>
+        <button class="btn btn-danger" onclick="limparTodosDados()">🗑️ Limpar todos os dados</button>
+      </div>
+      <input type="file" id="importFile" accept=".json" style="display:none;" onchange="processarImportacao(event)" />
+    </div>
+  `;
+  contentArea.innerHTML = html;
+}
+
+function exportarDados() {
+  const blob = new Blob([JSON.stringify(dados, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `minha_saude_backup_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importarDados() {
+  document.getElementById('importFile').click();
+}
+
+function processarImportacao(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const imported = JSON.parse(e.target.result);
+      if (imported.especialidades && imported.historico && imported.examesSangue) {
+        dados = imported;
+        salvarDados();
+        renderizarMenu();
+        navegarPara('dashboard');
+        alert('Dados importados com sucesso!');
+      } else {
+        alert('Arquivo inválido.');
+      }
+    } catch (err) {
+      alert('Erro ao ler arquivo.');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function limparTodosDados() {
+  if (confirm('Tem certeza que deseja apagar todos os dados? Essa ação não pode ser desfeita.')) {
+    localStorage.removeItem('minhaSaude');
+    carregarDados();
+    renderizarMenu();
+    navegarPara('dashboard');
+    alert('Dados limpos.');
+  }
 }
 
 // ---------- INICIALIZAÇÃO ----------
@@ -603,18 +676,27 @@ function init() {
   renderizarMenu();
   navegarPara('dashboard');
 
-  // Toggle menu mobile
+  // Menu mobile toggle
   menuToggle.addEventListener('click', () => {
     sidebar.classList.toggle('open');
   });
 
-  // Fecha menu ao clicar fora
+  // Fechar menu ao clicar fora (mobile)
   document.addEventListener('click', (e) => {
     if (window.innerWidth <= 768) {
       if (!sidebar.contains(e.target) && !menuToggle.contains(e.target)) {
         sidebar.classList.remove('open');
       }
     }
+  });
+
+  // Atualizar data
+  document.getElementById('currentDate').textContent = new Date().toLocaleDateString('pt-BR');
+
+  // Refresh
+  refreshBtn.addEventListener('click', () => {
+    const active = document.querySelector('.nav-item.active');
+    if (active) navegarPara(active.dataset.view);
   });
 }
 
